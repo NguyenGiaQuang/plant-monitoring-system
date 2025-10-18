@@ -22,6 +22,24 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
 });
 
+function showToast(message, type = 'success') {
+    const toastEl = document.getElementById('thresholdToast');
+    const toastBody = document.getElementById('thresholdToastBody');
+    if (!toastEl || !toastBody) return;
+
+    toastBody.textContent = message;
+
+    // Đổi màu nền nhanh theo type
+    toastEl.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info');
+    if (type === 'success') toastEl.classList.add('text-bg-success');
+    else if (type === 'error') toastEl.classList.add('text-bg-danger');
+    else toastEl.classList.add('text-bg-info');
+
+    const toast = new bootstrap.Toast(toastEl);
+    toast.show();
+}
+
+
 function connectWebSocket() {
     socket = io();
     
@@ -289,7 +307,10 @@ function setupEventListeners() {
     
     document.getElementById('threshold-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        
+
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalHtml = submitBtn.innerHTML;
+
         const newThresholds = {
             temperature_min: parseFloat(document.getElementById('temp-min').value),
             temperature_max: parseFloat(document.getElementById('temp-max').value),
@@ -297,28 +318,54 @@ function setupEventListeners() {
             humidity_min: parseFloat(document.getElementById('humidity-min').value),
             light_level_min: parseInt(document.getElementById('light-min').value)
         };
-        
+
+        // Giữ nguyên phần validate của bạn...
         if (newThresholds.temperature_min >= newThresholds.temperature_max) {
             alert('Nhiệt độ tối thiểu phải nhỏ hơn nhiệt độ tối đa!');
             return;
         }
-        
         if (newThresholds.soil_moisture_min < 0 || newThresholds.soil_moisture_min > 100) {
             alert('Độ ẩm đất phải nằm trong khoảng từ 0 đến 100!');
             return;
         }
-        
         if (newThresholds.humidity_min < 0 || newThresholds.humidity_min > 100) {
             alert('Độ ẩm không khí phải nằm trong khoảng từ 0 đến 100!');
             return;
         }
-        
         if (newThresholds.light_level_min < 0 || newThresholds.light_level_min > 100) {
             alert('Ánh sáng phải nằm trong khoảng từ 0 đến 100!');
             return;
         }
-        
-        socket.emit('set_thresholds', newThresholds);
+
+        // UX: disable nút + spinner
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang lưu...';
+
+        // Emit có callback (nhận ACK từ server)
+        let acked = false;
+        const ackTimeout = setTimeout(() => {
+            if (!acked) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalHtml;
+                showToast('Không nhận được phản hồi từ máy chủ. Vui lòng kiểm tra kết nối.', 'error');
+            }
+        }, 4000); // 4s
+
+        socket.emit('set_thresholds', newThresholds, (res) => {
+            acked = true;
+            clearTimeout(ackTimeout);
+
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalHtml;
+
+            if (res && res.ok) {
+                showToast('Lưu ngưỡng thành công!', 'success');
+                // Cập nhật local state nếu muốn:
+                thresholds = newThresholds;
+            } else {
+                showToast(res?.message || 'Lỗi khi lưu ngưỡng.', 'error');
+            }
+        });
     });
     
     const periodButtons = document.querySelectorAll('.period-btn');

@@ -261,7 +261,14 @@ def handle_set_mode(data):
 @socketio.on('set_thresholds')
 def handle_set_thresholds(data):
     logger.info(f"Setting thresholds to {data}")
-    mqtt.publish(TOPIC_THRESHOLDS, json.dumps(data), retain=True)
+    try:
+        mqtt.publish(TOPIC_THRESHOLDS, json.dumps(data), retain=True)
+        # Phản hồi ngay cho client (ACK)
+        return {"ok": True, "message": "Đã gửi ngưỡng mới lên thiết bị"}
+    except Exception as e:
+        logger.error(f"Failed to set thresholds: {e}")
+        return {"ok": False, "message": f"Lỗi: {str(e)}"}
+
 
 @socketio.on('send_command')
 def handle_send_command(data):
