@@ -104,34 +104,46 @@
 
             <div id="manual-controls" class="d-none">
               <h5>Điều Khiển Thủ Công</h5>
-              <div class="row">
-                <div class="col-6">
-                  <div class="d-grid gap-2">
-                    <button id="pump-on-btn" class="btn btn-success mb-2">
-                      <i class="fas fa-tint me-2"></i>Bơm BẬT
-                    </button>
-                    <button id="pump-off-btn" class="btn btn-outline-danger">
-                      <i class="fas fa-tint-slash me-2"></i>Bơm TẮT
-                    </button>
+
+              <div class="row g-3 align-items-center">
+                <div class="col-12 col-md-6">
+                  <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-white">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="fas fa-tint fs-5 text-primary"></i>
+                      <div>
+                        <div class="fw-semibold">Bơm</div>
+                        <small class="text-muted">Bật/Tắt máy bơm tưới</small>
+                      </div>
+                    </div>
+                    <div class="form-check form-switch m-0">
+                      <input class="form-check-input switch-lg" type="checkbox" id="pump-toggle">
+                      <label class="visually-hidden" for="pump-toggle">Công tắc bơm</label>
+                    </div>
                   </div>
                 </div>
-                <div class="col-6">
-                  <div class="d-grid gap-2">
-                    <button id="light-on-btn" class="btn btn-warning mb-2">
-                      <i class="fas fa-lightbulb me-2"></i>Đèn BẬT
-                    </button>
-                    <button id="light-off-btn" class="btn btn-outline-dark">
-                      <i class="far fa-lightbulb me-2"></i>Đèn TẮT
-                    </button>
+
+                <div class="col-12 col-md-6">
+                  <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-white">
+                    <div class="d-flex align-items-center gap-2">
+                      <i class="fas fa-lightbulb fs-5 text-warning"></i>
+                      <div>
+                        <div class="fw-semibold">Đèn</div>
+                        <small class="text-muted">Bật/Tắt đèn chiếu</small>
+                      </div>
+                    </div>
+                    <div class="form-check form-switch m-0">
+                      <input class="form-check-input switch-lg" type="checkbox" id="light-toggle">
+                      <label class="visually-hidden" for="light-toggle">Công tắc đèn</label>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div class="mt-3">
+              <!-- <div class="mt-3">
                 <p class="mb-0"><strong>Trạng Thái Hiện Tại:</strong></p>
                 <p>Bơm: <span id="pump-status" class="badge bg-secondary">Không Rõ</span></p>
                 <p>Đèn: <span id="light-status" class="badge bg-secondary">Không Rõ</span></p>
-              </div>
+              </div> -->
             </div>
 
             <div id="auto-thresholds">

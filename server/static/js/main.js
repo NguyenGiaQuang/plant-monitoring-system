@@ -13,6 +13,8 @@ let thresholds = {
     humidity_min: 40.0,
     light_level_min: 30
 };
+let isUpdatingPumpToggle = false;
+let isUpdatingLightToggle = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     connectWebSocket();
@@ -216,21 +218,49 @@ function updateControlStatus(data) {
     }
 }
 
-function updatePumpStatus(status) {
-    const pumpStatus = document.getElementById('pump-status');
-    if (pumpStatus) {
-        pumpStatus.textContent = status;
-        pumpStatus.className = `badge ${status === 'ON' ? 'status-on' : 'status-off'}`;
-    }
-}
+// function updatePumpStatus(status) {
+//     const pumpStatus = document.getElementById('pump-status');
+//     if (pumpStatus) {
+//         pumpStatus.textContent = status;
+//         pumpStatus.className = `badge ${status === 'ON' ? 'status-on' : 'status-off'}`;
+//     }
+// }
 
-function updateLightStatus(status) {
-    const lightStatus = document.getElementById('light-status');
-    if (lightStatus) {
-        lightStatus.textContent = status;
-        lightStatus.className = `badge ${status === 'ON' ? 'status-on' : 'status-off'}`;
+// function updateLightStatus(status) {
+//     const lightStatus = document.getElementById('light-status');
+//     if (lightStatus) {
+//         lightStatus.textContent = status;
+//         lightStatus.className = `badge ${status === 'ON' ? 'status-on' : 'status-off'}`;
+//     }
+// }
+    function updatePumpStatus(status) {
+        const pumpStatus = document.getElementById('pump-status');
+        if (pumpStatus) {
+            pumpStatus.textContent = status;
+            pumpStatus.className = `badge ${status === 'ON' ? 'status-on' : 'status-off'}`;
+        }
+        const pumpToggle = document.getElementById('pump-toggle');
+        if (pumpToggle) {
+            isUpdatingPumpToggle = true;
+            pumpToggle.checked = (status === 'ON');
+            // nhỏ delay để tránh race khi người dùng vừa click
+            setTimeout(() => { isUpdatingPumpToggle = false; }, 50);
+        }
     }
-}
+
+    function updateLightStatus(status) {
+        const lightStatus = document.getElementById('light-status');
+        if (lightStatus) {
+            lightStatus.textContent = status;
+            lightStatus.className = `badge ${status === 'ON' ? 'status-on' : 'status-off'}`;
+        }
+        const lightToggle = document.getElementById('light-toggle');
+        if (lightToggle) {
+            isUpdatingLightToggle = true;
+            lightToggle.checked = (status === 'ON');
+            setTimeout(() => { isUpdatingLightToggle = false; }, 50);
+        }
+    }
 
 function updateModeToggle() {
     const autoModeToggle = document.getElementById('auto-mode-toggle');
@@ -289,22 +319,41 @@ function setupEventListeners() {
         socket.emit('set_mode', { mode: mode });
     });
     
-    document.getElementById('pump-on-btn').addEventListener('click', function() {
-        socket.emit('send_command', { command: 'PUMP_ON' });
-    });
+    // document.getElementById('pump-on-btn').addEventListener('click', function() {
+    //     socket.emit('send_command', { command: 'PUMP_ON' });
+    // });
     
-    document.getElementById('pump-off-btn').addEventListener('click', function() {
-        socket.emit('send_command', { command: 'PUMP_OFF' });
-    });
+    // document.getElementById('pump-off-btn').addEventListener('click', function() {
+    //     socket.emit('send_command', { command: 'PUMP_OFF' });
+    // });
     
-    document.getElementById('light-on-btn').addEventListener('click', function() {
-        socket.emit('send_command', { command: 'LIGHT_ON' });
-    });
+    // document.getElementById('light-on-btn').addEventListener('click', function() {
+    //     socket.emit('send_command', { command: 'LIGHT_ON' });
+    // });
     
-    document.getElementById('light-off-btn').addEventListener('click', function() {
-        socket.emit('send_command', { command: 'LIGHT_OFF' });
-    });
+    // document.getElementById('light-off-btn').addEventListener('click', function() {
+    //     socket.emit('send_command', { command: 'LIGHT_OFF' });
+    // });
     
+    const pumpToggle = document.getElementById('pump-toggle');
+    const lightToggle = document.getElementById('light-toggle');
+
+    if (pumpToggle) {
+    pumpToggle.addEventListener('change', function () {
+        if (isUpdatingPumpToggle) return; // tránh phản ứng khi UI chỉ đang sync
+        const cmd = this.checked ? 'PUMP_ON' : 'PUMP_OFF';
+        socket.emit('send_command', { command: cmd });
+    });
+    }
+
+    if (lightToggle) {
+    lightToggle.addEventListener('change', function () {
+        if (isUpdatingLightToggle) return;
+        const cmd = this.checked ? 'LIGHT_ON' : 'LIGHT_OFF';
+        socket.emit('send_command', { command: cmd });
+    });
+    }
+
     document.getElementById('threshold-form').addEventListener('submit', function(e) {
         e.preventDefault();
 
