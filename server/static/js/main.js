@@ -309,14 +309,50 @@ function fetchThresholds() {
 }
 
 function setupEventListeners() {
-    const autoModeToggle = document.getElementById('auto-mode-toggle');
-    autoModeToggle.addEventListener('change', function() {
-        if (isUpdatingMode) {
-            return;
-        }
+    // const autoModeToggle = document.getElementById('auto-mode-toggle');
+    // autoModeToggle.addEventListener('change', function() {
+    //     if (isUpdatingMode) {
+    //         return;
+    //     }
         
-        const mode = this.checked ? 'AUTO' : 'MANUAL';
-        socket.emit('set_mode', { mode: mode });
+    //     const mode = this.checked ? 'AUTO' : 'MANUAL';
+    //     socket.emit('set_mode', { mode: mode });
+    // });
+    const autoModeToggle = document.getElementById('auto-mode-toggle');
+    autoModeToggle.addEventListener('change', function () {
+        if (isUpdatingMode) return;
+
+        // 1) Cập nhật UI NGAY (optimistic)
+        const nextMode = this.checked ? 'AUTO' : 'MANUAL';
+        currentMode = nextMode;
+        updateModeToggle(); // show/hide #manual-controls / #auto-thresholds ngay
+
+        // 2) Gửi lên server + nhận ACK (để đồng bộ/hiển thị thông báo nếu muốn)
+        let acked = false;
+        const t = setTimeout(() => {
+            if (!acked) {
+                // Hết thời gian chờ ACK: có thể revert UI nếu cần, hoặc chỉ thông báo
+                // Ví dụ: showToast('Không nhận được phản hồi khi đổi chế độ', 'error');
+                // (giữ UI optimistic để tránh giật)
+            }
+        }, 3000);
+
+        socket.emit('set_mode', { mode: nextMode }, (res) => {
+            acked = true;
+            clearTimeout(t);
+            if (!res || !res.ok) {
+                // Nếu lỗi, revert về trạng thái cũ
+                currentMode = nextMode === 'AUTO' ? 'MANUAL' : 'AUTO';
+                isUpdatingMode = true;
+                autoModeToggle.checked = (currentMode === 'AUTO');
+                updateModeToggle();
+                setTimeout(() => { isUpdatingMode = false; }, 50);
+                // Ví dụ: showToast(res?.message || 'Đổi chế độ thất bại', 'error');
+            } else {
+                // Thành công: có thể show toast nhẹ
+                // showToast(`Đã chuyển sang ${nextMode === 'AUTO' ? 'chế độ tự động' : 'chế độ thủ công'}`, 'success');
+            }
+        });
     });
     
     // document.getElementById('pump-on-btn').addEventListener('click', function() {

@@ -252,11 +252,22 @@ def handle_websocket_connect():
 def handle_websocket_disconnect():
     logger.info(f"Client disconnected: {request.sid}")
 
+# @socketio.on('set_mode')
+# def handle_set_mode(data):
+#     mode = data.get('mode', 'AUTO')
+#     logger.info(f"Setting mode to {mode}")
+#     mqtt.publish(TOPIC_MODE, mode, retain=True)
 @socketio.on('set_mode')
 def handle_set_mode(data):
     mode = data.get('mode', 'AUTO')
     logger.info(f"Setting mode to {mode}")
-    mqtt.publish(TOPIC_MODE, mode, retain=True)
+    try:
+        mqtt.publish(TOPIC_MODE, mode, retain=True)
+        return {"ok": True, "mode": mode}
+    except Exception as e:
+        logger.error(f"Failed to set mode: {e}")
+        return {"ok": False, "message": str(e)}
+
 
 @socketio.on('set_thresholds')
 def handle_set_thresholds(data):
