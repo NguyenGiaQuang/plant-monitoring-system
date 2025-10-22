@@ -41,6 +41,32 @@ function showToast(message, type = 'success') {
     toast.show();
 }
 
+function setThresholdStatus(variant, text, withSpinner = false) {
+  const el = document.getElementById('threshold-status');
+  if (!el) return;
+
+  // reset
+  el.className = 'badge rounded-pill align-middle ms-3';
+  el.classList.add('text-bg-' + variant); // success | info | secondary | danger
+  el.classList.remove('d-none');
+
+  // spinner
+  const spinnerHtml = withSpinner
+    ? '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>'
+    : '';
+
+  el.innerHTML = spinnerHtml + (text || '');
+}
+
+function hideThresholdStatus(delayMs = 0) {
+  const el = document.getElementById('threshold-status');
+  if (!el) return;
+  if (delayMs <= 0) {
+    el.classList.add('d-none');
+  } else {
+    setTimeout(() => el.classList.add('d-none'), delayMs);
+  }
+}
 
 function connectWebSocket() {
     socket = io();
@@ -391,66 +417,110 @@ function setupEventListeners() {
     }
 
     document.getElementById('threshold-form').addEventListener('submit', function(e) {
-        e.preventDefault();
+    e.preventDefault();
 
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalHtml = submitBtn.innerHTML;
+    const submitBtn = document.getElementById('save-thresholds-btn');
+    const originalHtml = submitBtn.innerHTML;
 
-        const newThresholds = {
-            temperature_min: parseFloat(document.getElementById('temp-min').value),
-            temperature_max: parseFloat(document.getElementById('temp-max').value),
-            soil_moisture_min: parseInt(document.getElementById('soil-min').value),
-            humidity_min: parseFloat(document.getElementById('humidity-min').value),
-            light_level_min: parseInt(document.getElementById('light-min').value)
-        };
+    const newThresholds = {
+        temperature_min: parseFloat(document.getElementById('temp-min').value),
+        temperature_max: parseFloat(document.getElementById('temp-max').value),
+        soil_moisture_min: parseInt(document.getElementById('soil-min').value),
+        humidity_min: parseFloat(document.getElementById('humidity-min').value),
+        light_level_min: parseInt(document.getElementById('light-min').value)
+    };
 
-        // Giữ nguyên phần validate của bạn...
-        if (newThresholds.temperature_min >= newThresholds.temperature_max) {
-            alert('Nhiệt độ tối thiểu phải nhỏ hơn nhiệt độ tối đa!');
-            return;
+    // --- validate như hiện có của bạn ---
+    if (newThresholds.temperature_min >= newThresholds.temperature_max) { alert('Nhiệt độ tối thiểu phải nhỏ hơn nhiệt độ tối đa!'); return; }
+    if (newThresholds.soil_moisture_min < 0 || newThresholds.soil_moisture_min > 100) { alert('Độ ẩm đất phải nằm trong khoảng từ 0 đến 100!'); return; }
+    if (newThresholds.humidity_min < 0 || newThresholds.humidity_min > 100) { alert('Độ ẩm không khí phải nằm trong khoảng từ 0 đến 100!'); return; }
+    if (newThresholds.light_level_min < 0 || newThresholds.light_level_min > 100) { alert('Ánh sáng phải nằm trong khoảng từ 0 đến 100!'); return; }
+
+    // Nút + badge
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang lưu...';
+    setThresholdStatus('secondary', 'Đang áp dụng…', true);
+
+    let done = false;
+
+    // Fallback 2: thiết bị áp dụng xong (MQTT → server → socket)
+    const onThresholdsUpdate = (data) => {
+        if (done) return;
+        const same =
+        Math.round(data.temperature_min * 10) === Math.round(newThresholds.temperature_min * 10) &&
+        Math.round(data.temperature_max * 10) === Math.round(newThresholds.temperature_max * 10) &&
+        data.soil_moisture_min === newThresholds.soil_moisture_min &&
+        Math.round(data.humidity_min) === Math.round(newThresholds.humidity_min) &&
+        data.light_level_min === newThresholds.light_level_min;
+
+        if (same) {
+        done = true;
+        socket.off('thresholds_update', onThresholdsUpdate);
+        socket.off('thresholds_saved', onSaved);
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHtml;
+
+        setThresholdStatus('success', 'Đã áp dụng!');
+        hideThresholdStatus(1500);
+        // showToast('Thiết bị đã áp dụng ngưỡng mới.', 'success'); // nếu muốn hiện thêm toast
         }
-        if (newThresholds.soil_moisture_min < 0 || newThresholds.soil_moisture_min > 100) {
-            alert('Độ ẩm đất phải nằm trong khoảng từ 0 đến 100!');
-            return;
+    };
+    socket.on('thresholds_update', onThresholdsUpdate);
+
+    // Xác nhận server đã gửi lệnh tới thiết bị (nhanh)
+    const onSaved = (res) => {
+        socket.off('thresholds_saved', onSaved);
+        if (done) return;
+
+        if (res && res.ok) {
+        setThresholdStatus('info', 'Đã gửi, đang áp dụng…', true);
+        } else {
+        done = true;
+        socket.off('thresholds_update', onThresholdsUpdate);
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHtml;
+
+        setThresholdStatus('danger', res?.message || 'Lỗi khi lưu ngưỡng.');
+        hideThresholdStatus(4000);
+        // showToast(res?.message || 'Lỗi khi lưu ngưỡng.', 'error');
         }
-        if (newThresholds.humidity_min < 0 || newThresholds.humidity_min > 100) {
-            alert('Độ ẩm không khí phải nằm trong khoảng từ 0 đến 100!');
-            return;
+    };
+    socket.on('thresholds_saved', onSaved);
+
+    // Emit + ACK (giữ làm cửa an toàn, không hiển thị lỗi sớm)
+    socket.emit('set_thresholds', newThresholds, (res) => {
+        if (done) return;
+        if (!res || !res.ok) {
+        done = true;
+        socket.off('thresholds_update', onThresholdsUpdate);
+        socket.off('thresholds_saved', onSaved);
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHtml;
+
+        setThresholdStatus('danger', res?.message || 'Lỗi khi lưu ngưỡng.');
+        hideThresholdStatus(4000);
+        // showToast(res?.message || 'Lỗi khi lưu ngưỡng.', 'error');
         }
-        if (newThresholds.light_level_min < 0 || newThresholds.light_level_min > 100) {
-            alert('Ánh sáng phải nằm trong khoảng từ 0 đến 100!');
-            return;
-        }
+        // nếu ok: cứ để badge ở trạng thái "Đã gửi, đang áp dụng…" → chờ thresholds_update để kết luận
+    });
 
-        // UX: disable nút + spinner
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Đang lưu...';
+    // Timeout cuối: quá 12s mà chưa áp dụng
+    setTimeout(() => {
+        if (done) return;
+        done = true;
+        socket.off('thresholds_update', onThresholdsUpdate);
+        socket.off('thresholds_saved', onSaved);
 
-        // Emit có callback (nhận ACK từ server)
-        let acked = false;
-        const ackTimeout = setTimeout(() => {
-            if (!acked) {
-                submitBtn.disabled = false;
-                submitBtn.innerHTML = originalHtml;
-                showToast('Không nhận được phản hồi từ máy chủ. Vui lòng kiểm tra kết nối.', 'error');
-            }
-        }, 4000); // 4s
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalHtml;
 
-        socket.emit('set_thresholds', newThresholds, (res) => {
-            acked = true;
-            clearTimeout(ackTimeout);
-
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalHtml;
-
-            if (res && res.ok) {
-                showToast('Lưu ngưỡng thành công!', 'success');
-                // Cập nhật local state nếu muốn:
-                thresholds = newThresholds;
-            } else {
-                showToast(res?.message || 'Lỗi khi lưu ngưỡng.', 'error');
-            }
-        });
+        setThresholdStatus('danger', 'Phản hồi chậm. Thiết bị có thể đã nhận lệnh.');
+        hideThresholdStatus(5000);
+        // showToast('Hệ thống phản hồi chậm. Thiết bị có thể đã nhận lệnh.', 'error');
+    }, 12000);
     });
     
     const periodButtons = document.querySelectorAll('.period-btn');

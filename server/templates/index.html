@@ -169,9 +169,13 @@
                   <label for="light-min" class="form-label">Ánh sáng tối thiểu (%)</label>
                   <input type="number" class="form-control" id="light-min" min="0" max="100" step="1">
                 </div>
-                <button type="submit" class="btn btn-primary">
-                  <i class="fas fa-save me-2"></i>Lưu Ngưỡng
-                </button>
+                <button type="submit" id="save-thresholds-btn" class="btn btn-primary">
+                <i class="fas fa-save me-2"></i>Lưu Ngưỡng
+              </button>
+              <span id="threshold-status" class="badge rounded-pill text-bg-secondary align-middle ms-3 d-none">
+                <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                Đang áp dụng…
+              </span>
               </form>
             </div>
           </div>

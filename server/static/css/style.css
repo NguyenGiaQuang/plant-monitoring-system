@@ -197,3 +197,5 @@ body {
   background-color: #0d6efd;
   border-color: #0d6efd;
 }
+
+#threshold-status .spinner-border { vertical-align: -1px; }
