@@ -24,6 +24,33 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
 });
 
+// Thêm 1 điểm vào chart đang hiển thị (chỉ làm khi chọn "Ngày")
+function appendLiveSampleToCharts(sample) {
+    if (currentPeriod !== 'day') return; // chỉ stream khi xem theo Ngày
+
+    const ts = new Date(); // lấy thời điểm hiện tại (hoặc sample.timestamp nếu server gửi kèm)
+    const label = ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // helper
+    const pushPoint = (chart, value) => {
+        if (!chart) return;
+        chart.data.labels.push(label);
+        chart.data.datasets[0].data.push(value);
+        // giữ tối đa N điểm cho mượt (ví dụ 60 điểm ~ 1h nếu mỗi phút 1 điểm)
+        const MAX_POINTS = 120;
+        if (chart.data.labels.length > MAX_POINTS) {
+            chart.data.labels.shift();
+            chart.data.datasets[0].data.shift();
+        }
+        chart.update();
+    };
+
+    if (typeof sample.temperature !== 'undefined') pushPoint(temperatureChart, sample.temperature);
+    if (typeof sample.humidity !== 'undefined') pushPoint(humidityChart, sample.humidity);
+    if (typeof sample.soil_moisture !== 'undefined') pushPoint(soilMoistureChart, sample.soil_moisture);
+    if (typeof sample.light_level !== 'undefined') pushPoint(lightLevelChart, sample.light_level);
+}
+
 function showToast(message, type = 'success') {
     const toastEl = document.getElementById('thresholdToast');
     const toastBody = document.getElementById('thresholdToastBody');
@@ -69,16 +96,24 @@ function hideThresholdStatus(delayMs = 0) {
 }
 
 function connectWebSocket() {
-    socket = io();
+    // socket = io();
     
+    // socket.on('connect', function() {
+    //     console.log('Đã kết nối với máy chủ WebSocket');
+    // });
+    
+    // socket.on('disconnect', function() {
+    //     console.log('Đã ngắt kết nối với máy chủ WebSocket');
+    // });
+    socket = io({ transports: ['websocket'] });
+
     socket.on('connect', function() {
         console.log('Đã kết nối với máy chủ WebSocket');
     });
-    
     socket.on('disconnect', function() {
         console.log('Đã ngắt kết nối với máy chủ WebSocket');
     });
-    
+
     socket.on('initial_state', function(data) {
         console.log('Nhận trạng thái ban đầu:', data);
         
@@ -96,6 +131,7 @@ function connectWebSocket() {
     
     socket.on('sensor_data_update', function(data) {
         updateSensorValues(data);
+        appendLiveSampleToCharts(data);  
     });
     
     socket.on('temperature_update', function(data) {
